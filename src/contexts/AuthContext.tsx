@@ -1,6 +1,6 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from '@/types';
+import { User, UserRole } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
@@ -26,12 +26,12 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-// Mock data until we integrate with Supabase
-const MOCK_USERS = [
-  { id: '1', name: 'Admin User', role: 'admin' },
-  { id: '2', name: 'Juan Camarero', code: '1234', role: 'waiter' },
-  { id: '3', name: 'María Camarera', code: '5678', role: 'waiter' },
-  { id: '4', name: 'Chef Carlos', role: 'kitchen' },
+// Mock data until we integrate with Supabase - with proper type annotations
+const MOCK_USERS: User[] = [
+  { id: '1', name: 'Admin User', role: 'admin' as UserRole },
+  { id: '2', name: 'Juan Camarero', code: '1234', role: 'waiter' as UserRole },
+  { id: '3', name: 'María Camarera', code: '5678', role: 'waiter' as UserRole },
+  { id: '4', name: 'Chef Carlos', role: 'kitchen' as UserRole },
 ];
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
