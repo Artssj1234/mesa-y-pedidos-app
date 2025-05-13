@@ -8,19 +8,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Product, OrderItem, Category } from "@/types";
-import { mockCategories } from "@/services/mockData";
+import { OrderItem, OrderStatus } from "@/types";
+import OrderCard from "@/components/OrderCard";
 
 const Waiter = () => {
   const { user } = useAuth();
-  const { tables, products, createOrder } = useOrders();
+  const { tables, products, orders, createOrder } = useOrders();
   const navigate = useNavigate();
   
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
   const [observations, setObservations] = useState("");
-  const [activeCategory, setActiveCategory] = useState<string>(mockCategories[0]?.id || "");
-  const [categories, setCategories] = useState<Category[]>(mockCategories);
+  const [activeCategory, setActiveCategory] = useState<string>("");
   
   // Redirect if not waiter
   useEffect(() => {
@@ -29,31 +28,53 @@ const Waiter = () => {
     }
   }, [user, navigate]);
   
+  // Set first category as active when products load
+  useEffect(() => {
+    if (products.length > 0) {
+      const categories = [...new Set(products.map(p => p.category_id))];
+      if (categories.length > 0 && !activeCategory) {
+        setActiveCategory(categories[0] || "");
+      }
+    }
+  }, [products, activeCategory]);
+  
   // Filter active tables
   const activeTables = tables.filter(table => table.active);
   
-  // Group products by category
-  const productsByCategory = products.reduce((acc, product) => {
-    if (!acc[product.category_id]) {
-      acc[product.category_id] = [];
-    }
-    acc[product.category_id].push(product);
-    return acc;
-  }, {} as Record<string, Product[]>);
+  // Get unique categories from products
+  const categories = [...new Set(products.map(p => p.category))].filter(Boolean);
+  
+  // Filter products by active category
+  const filteredProducts = products.filter(p => p.category_id === activeCategory);
+  
+  // Filter active orders for this waiter
+  const activeOrders = orders.filter(order => 
+    order.user_id === user?.id && 
+    (order.status === 'pending' || order.status === 'preparing')
+  );
+  
+  // Filter ready orders for this waiter
+  const readyOrders = orders.filter(order => 
+    order.user_id === user?.id && 
+    order.status === 'ready'
+  );
   
   // Add item to order
-  const addItem = (product: Product) => {
+  const addItem = (productId: string) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+    
     setSelectedItems(prev => {
-      const existingItem = prev.find(item => item.product_id === product.id);
+      const existingItem = prev.find(item => item.product_id === productId);
       if (existingItem) {
         return prev.map(item => 
-          item.product_id === product.id 
+          item.product_id === productId 
             ? { ...item, quantity: item.quantity + 1 } 
             : item
         );
       } else {
         return [...prev, {
-          product_id: product.id,
+          product_id: productId,
           product_name: product.name,
           product_price: product.price,
           quantity: 1
@@ -138,25 +159,27 @@ const Waiter = () => {
                     <div className="mb-4 overflow-x-auto">
                       <div className="flex space-x-2">
                         {categories.map(category => (
-                          <Button
-                            key={category.id}
-                            variant={activeCategory === category.id ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setActiveCategory(category.id)}
-                          >
-                            {category.name}
-                          </Button>
+                          category && (
+                            <Button
+                              key={category.id}
+                              variant={activeCategory === category.id ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setActiveCategory(category.id)}
+                            >
+                              {category.name}
+                            </Button>
+                          )
                         ))}
                       </div>
                     </div>
                     
                     <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                      {productsByCategory[activeCategory]?.map(product => (
+                      {filteredProducts.map(product => (
                         <Button
                           key={product.id}
                           variant="outline"
                           className="w-full justify-between"
-                          onClick={() => addItem(product)}
+                          onClick={() => addItem(product.id)}
                         >
                           <span>{product.name}</span>
                           <span>{product.price.toFixed(2)}€</span>
@@ -235,8 +258,36 @@ const Waiter = () => {
             </TabsContent>
             
             <TabsContent value="activeOrders">
-              <div className="p-6 text-center">
-                <p className="text-gray-500">Función en desarrollo...</p>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-lg font-medium mb-4">Pedidos en preparación</h3>
+                  {activeOrders.length === 0 ? (
+                    <div className="p-8 text-center bg-white rounded-lg shadow-sm border">
+                      <p className="text-gray-500">No hay pedidos en preparación</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {activeOrders.map(order => (
+                        <OrderCard key={order.id} order={order} showControls={false} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-medium mb-4">Pedidos listos para servir</h3>
+                  {readyOrders.length === 0 ? (
+                    <div className="p-8 text-center bg-white rounded-lg shadow-sm border">
+                      <p className="text-gray-500">No hay pedidos listos</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {readyOrders.map(order => (
+                        <OrderCard key={order.id} order={order} showControls={false} />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </TabsContent>
           </Tabs>

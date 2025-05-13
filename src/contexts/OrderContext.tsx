@@ -2,7 +2,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Order, OrderStatus, OrderItem, Product, Table } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { mockOrders, mockProducts, mockTables } from '@/services/mockData';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OrderContextType {
   orders: Order[];
@@ -28,51 +28,178 @@ interface OrderProviderProps {
 
 export const OrderProvider = ({ children }: OrderProviderProps) => {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [tables, setTables] = useState<Table[]>(mockTables);
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const [tables, setTables] = useState<Table[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const { toast } = useToast();
 
+  // Fetch tables from Supabase
   useEffect(() => {
-    // Initialize with mock data
-    setOrders(mockOrders);
+    const fetchTables = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('restaurant_tables')
+          .select('*');
+        
+        if (error) throw error;
+        
+        const formattedTables = data.map(table => ({
+          id: table.id,
+          number: table.number,
+          active: table.active
+        }));
+        
+        setTables(formattedTables);
+      } catch (error) {
+        console.error('Error fetching tables:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No se pudieron cargar las mesas",
+        });
+      }
+    };
 
-    // This would be replaced with Supabase real-time subscription
-    const interval = setInterval(() => {
-      // Simulate receiving new orders or updates
-      console.log("Checking for updates...");
-    }, 5000);
+    fetchTables();
+  }, [toast]);
 
-    return () => clearInterval(interval);
-  }, []);
+  // Fetch products from Supabase
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*, categories(name)');
+        
+        if (error) throw error;
+        
+        const formattedProducts = data.map(product => ({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          category_id: product.category_id,
+          category: product.categories ? { id: product.category_id, name: product.categories.name } : undefined
+        }));
+        
+        setProducts(formattedProducts);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No se pudieron cargar los productos",
+        });
+      }
+    };
+
+    fetchProducts();
+  }, [toast]);
+
+  // Fetch orders from Supabase and set up realtime subscription
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items(id, product_id, quantity, products:product_id(name, price)),
+            tables:restaurant_tables!orders_table_id_fkey(number),
+            users!orders_user_id_fkey(name)
+          `)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+
+        const formattedOrders = data.map(order => {
+          const orderItems = order.order_items.map((item: any) => ({
+            id: item.id,
+            order_id: order.id,
+            product_id: item.product_id,
+            product_name: item.products?.name,
+            product_price: item.products?.price,
+            quantity: item.quantity
+          }));
+
+          return {
+            id: order.id,
+            table_id: order.table_id,
+            table_number: order.tables?.number,
+            observations: order.observations || '',
+            status: order.status as OrderStatus,
+            user_id: order.user_id,
+            waiter_name: order.users?.name,
+            created_at: order.created_at,
+            items: orderItems
+          };
+        });
+        
+        setOrders(formattedOrders);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No se pudieron cargar los pedidos",
+        });
+      }
+    };
+
+    fetchOrders();
+
+    // Set up realtime subscription
+    const channel = supabase
+      .channel('orders-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'orders' }, 
+        () => {
+          fetchOrders();
+        })
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'order_items' }, 
+        () => {
+          fetchOrders();
+        })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [toast]);
 
   const createOrder = async (tableId: string, items: OrderItem[], observations: string, userId: string) => {
     try {
-      // This would be replaced with a Supabase insert
-      const newOrder: Order = {
-        id: `order_${Date.now()}`,
-        table_id: tableId,
-        table_number: tables.find(t => t.id === tableId)?.number,
-        observations,
-        status: 'pending',
-        user_id: userId,
-        waiter_name: 'Juan Camarero', // This would come from the actual user data
-        created_at: new Date().toISOString(),
-        items: items.map(item => {
-          const product = products.find(p => p.id === item.product_id);
-          return {
-            ...item,
-            product_name: product?.name,
-            product_price: product?.price
-          };
-        }),
-      };
-
-      // Add to local state
-      setOrders(prevOrders => [...prevOrders, newOrder]);
+      // Insert order
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          table_id: tableId,
+          observations,
+          status: 'pending',
+          user_id: userId
+        })
+        .select()
+        .single();
+      
+      if (orderError) throw orderError;
+      
+      // Insert order items
+      const orderItems = items.map(item => ({
+        order_id: orderData.id,
+        product_id: item.product_id,
+        quantity: item.quantity
+      }));
+      
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+      
+      if (itemsError) throw itemsError;
+      
+      const tableInfo = tables.find(t => t.id === tableId);
       
       toast({
         title: "Pedido creado",
-        description: `Pedido enviado a cocina para mesa ${newOrder.table_number}`,
+        description: `Pedido enviado a cocina para mesa ${tableInfo?.number}`,
       });
       
       return Promise.resolve();
@@ -89,12 +216,12 @@ export const OrderProvider = ({ children }: OrderProviderProps) => {
 
   const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
     try {
-      // This would be replaced with a Supabase update
-      setOrders(prevOrders =>
-        prevOrders.map(order =>
-          order.id === orderId ? { ...order, status } : order
-        )
-      );
+      const { error } = await supabase
+        .from('orders')
+        .update({ status })
+        .eq('id', orderId);
+      
+      if (error) throw error;
       
       const statusMessages = {
         pending: "pendiente",

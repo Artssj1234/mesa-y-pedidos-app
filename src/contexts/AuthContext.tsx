@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { User, UserRole } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AuthContextType {
   user: User | null;
@@ -25,14 +26,6 @@ export const useAuth = () => {
 interface AuthProviderProps {
   children: ReactNode;
 }
-
-// Mock data until we integrate with Supabase - with proper type annotations
-const MOCK_USERS: User[] = [
-  { id: '1', name: 'Admin User', role: 'admin' as UserRole },
-  { id: '2', name: 'Juan Camarero', code: '1234', role: 'waiter' as UserRole },
-  { id: '3', name: 'María Camarera', code: '5678', role: 'waiter' as UserRole },
-  { id: '4', name: 'Chef Carlos', role: 'kitchen' as UserRole },
-];
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
@@ -57,28 +50,42 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const login = async (code: string) => {
     setIsLoading(true);
     try {
-      // This would be replaced with a Supabase query
-      const user = MOCK_USERS.find(u => u.code === code && (u.role === 'waiter' || u.role === 'kitchen'));
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('code', code)
+        .in('role', ['waiter', 'kitchen'])
+        .single();
       
-      if (user) {
-        setUser(user);
-        localStorage.setItem('restaurant_user', JSON.stringify(user));
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Error de autenticación",
+          description: "Código PIN incorrecto",
+        });
+        return;
+      }
+      
+      if (data) {
+        const userData: User = {
+          id: data.id,
+          name: data.name,
+          code: data.code,
+          role: data.role as UserRole
+        };
         
-        if (user.role === 'waiter') {
+        setUser(userData);
+        localStorage.setItem('restaurant_user', JSON.stringify(userData));
+        
+        if (userData.role === 'waiter') {
           navigate('/camarero');
-        } else if (user.role === 'kitchen') {
+        } else if (userData.role === 'kitchen') {
           navigate('/cocina');
         }
         
         toast({
           title: "Sesión iniciada",
-          description: `Bienvenido, ${user.name}`,
-        });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error de autenticación",
-          description: "Código PIN incorrecto",
+          description: `Bienvenido, ${userData.name}`,
         });
       }
     } catch (error) {
@@ -96,24 +103,46 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const adminLogin = async (username: string, password: string) => {
     setIsLoading(true);
     try {
-      // This would be replaced with a Supabase query
-      // For demo purposes, accept any admin with password "admin"
-      const user = MOCK_USERS.find(u => u.name.toLowerCase() === username.toLowerCase() && u.role === 'admin');
+      // For admin, we'll check username and use a fixed password for simplicity
+      // In a real app, you'd want to use proper authentication
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('name', username)
+        .eq('role', 'admin')
+        .single();
       
-      if (user && password === 'admin') {
-        setUser(user);
-        localStorage.setItem('restaurant_user', JSON.stringify(user));
+      if (error || !data) {
+        toast({
+          variant: "destructive",
+          title: "Error de autenticación",
+          description: "Credenciales incorrectas",
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      // In this demo, we're accepting "admin" as the password for all admin users
+      if (password === 'admin') {
+        const userData: User = {
+          id: data.id,
+          name: data.name,
+          role: data.role as UserRole
+        };
+        
+        setUser(userData);
+        localStorage.setItem('restaurant_user', JSON.stringify(userData));
         navigate('/admin');
         
         toast({
           title: "Sesión iniciada",
-          description: `Bienvenido, ${user.name}`,
+          description: `Bienvenido, ${userData.name}`,
         });
       } else {
         toast({
           variant: "destructive",
           title: "Error de autenticación",
-          description: "Credenciales incorrectas",
+          description: "Contraseña incorrecta",
         });
       }
     } catch (error) {

@@ -63,7 +63,7 @@ const OrderCard = ({ order, showControls = true }: OrderCardProps) => {
                 <span className="font-medium">{item.quantity}x</span> {item.product_name}
               </div>
               <div className="text-gray-600">
-                {(item.product_price || 0) * item.quantity}€
+                {((item.product_price || 0) * item.quantity).toFixed(2)}€
               </div>
             </li>
           ))}
