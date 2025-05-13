@@ -14,9 +14,9 @@ const OrderCard = ({ order, showControls = true }: OrderCardProps) => {
   const { updateOrderStatus } = useOrders();
   
   const statusColors = {
-    pending: 'bg-order-pending',
-    preparing: 'bg-order-preparing',
-    ready: 'bg-order-ready'
+    pending: 'bg-amber-500',
+    preparing: 'bg-blue-500',
+    ready: 'bg-green-500'
   };
   
   const statusLabels = {
@@ -41,13 +41,21 @@ const OrderCard = ({ order, showControls = true }: OrderCardProps) => {
     }, 0);
   };
   
+  const handleStatusUpdate = async (status: OrderStatus) => {
+    try {
+      await updateOrderStatus(order.id, status);
+    } catch (error) {
+      console.error("Error al actualizar el estado:", error);
+    }
+  };
+  
   return (
     <Card className="w-full animate-fade-in">
       <CardHeader className="pb-2 flex flex-row justify-between items-center">
         <div>
           <div className="text-lg font-bold">Mesa {order.table_number}</div>
           <div className="text-xs text-gray-500">
-            {formatTime(order.created_at)} • {order.waiter_name}
+            {order.created_at && formatTime(order.created_at)} • {order.waiter_name}
           </div>
         </div>
         <Badge className={`${statusColors[order.status]} text-white`}>
@@ -86,8 +94,8 @@ const OrderCard = ({ order, showControls = true }: OrderCardProps) => {
             {order.status === 'pending' && (
               <Button 
                 variant="outline"
-                className="border-order-preparing text-order-preparing"
-                onClick={() => updateOrderStatus(order.id, 'preparing')}
+                className="border-blue-500 text-blue-500 hover:bg-blue-50"
+                onClick={() => handleStatusUpdate('preparing')}
               >
                 Preparando
               </Button>
@@ -96,8 +104,8 @@ const OrderCard = ({ order, showControls = true }: OrderCardProps) => {
             {order.status === 'preparing' && (
               <Button 
                 variant="outline"
-                className="border-order-ready text-order-ready"
-                onClick={() => updateOrderStatus(order.id, 'ready')}
+                className="border-green-500 text-green-500 hover:bg-green-50"
+                onClick={() => handleStatusUpdate('ready')}
               >
                 Listo
               </Button>

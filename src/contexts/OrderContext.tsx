@@ -168,6 +168,8 @@ export const OrderProvider = ({ children }: OrderProviderProps) => {
 
   const createOrder = async (tableId: string, items: OrderItem[], observations: string, userId: string) => {
     try {
+      console.log("Enviando pedido:", { tableId, items, observations, userId });
+      
       // Insert order
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
@@ -180,7 +182,12 @@ export const OrderProvider = ({ children }: OrderProviderProps) => {
         .select()
         .single();
       
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error("Error al crear el pedido:", orderError);
+        throw orderError;
+      }
+      
+      console.log("Pedido creado:", orderData);
       
       // Insert order items
       const orderItems = items.map(item => ({
@@ -189,11 +196,16 @@ export const OrderProvider = ({ children }: OrderProviderProps) => {
         quantity: item.quantity
       }));
       
+      console.log("Insertando items:", orderItems);
+      
       const { error: itemsError } = await supabase
         .from('order_items')
         .insert(orderItems);
       
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error("Error al insertar items:", itemsError);
+        throw itemsError;
+      }
       
       const tableInfo = tables.find(t => t.id === tableId);
       
@@ -216,12 +228,17 @@ export const OrderProvider = ({ children }: OrderProviderProps) => {
 
   const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
     try {
+      console.log("Actualizando estado del pedido:", { orderId, status });
+      
       const { error } = await supabase
         .from('orders')
         .update({ status })
         .eq('id', orderId);
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error al actualizar estado:", error);
+        throw error;
+      }
       
       const statusMessages = {
         pending: "pendiente",
