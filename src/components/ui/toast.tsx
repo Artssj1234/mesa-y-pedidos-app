@@ -291,6 +291,12 @@ const useToast = () => {
   }
 }
 
+// Create a standalone toast function that can be used without the hook
+const toast = (props: Omit<ToasterToast, "id">) => {
+  const { toast: hookToast } = useToast()
+  return hookToast(props)
+}
+
 // Export the toast functions
 export {
   type ToastProps,
