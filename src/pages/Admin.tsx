@@ -118,7 +118,11 @@ const Admin = () => {
         return;
       }
       
-      setStaff(data);
+      // Cast the role from string to UserRole type
+      setStaff(data.map(user => ({
+        ...user,
+        role: user.role as UserRole
+      })));
     };
     
     fetchCategories();
@@ -499,7 +503,12 @@ const Admin = () => {
       
       if (error) throw error;
       
-      setStaff(data);
+      // Cast the role from string to UserRole type
+      setStaff(data.map(user => ({
+        ...user,
+        role: user.role as UserRole
+      })));
+      
       setStaffDialog(false);
       resetStaffForm();
     } catch (error) {
