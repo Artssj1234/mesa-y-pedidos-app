@@ -5,6 +5,7 @@ import { useOrders } from "@/contexts/OrderContext";
 import Header from "@/components/Header";
 import OrderCard from "@/components/OrderCard";
 import { useNavigate } from "react-router-dom";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Kitchen = () => {
   const { user } = useAuth();

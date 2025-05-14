@@ -4,6 +4,8 @@ import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useOrders } from '@/contexts/OrderContext';
+import { useState } from 'react';
+import { Loader2 } from 'lucide-react';
 
 interface OrderCardProps {
   order: Order;
@@ -12,6 +14,7 @@ interface OrderCardProps {
 
 const OrderCard = ({ order, showControls = true }: OrderCardProps) => {
   const { updateOrderStatus } = useOrders();
+  const [isUpdating, setIsUpdating] = useState(false);
   
   const statusColors = {
     pending: 'bg-amber-500',
@@ -43,9 +46,12 @@ const OrderCard = ({ order, showControls = true }: OrderCardProps) => {
   
   const handleStatusUpdate = async (status: OrderStatus) => {
     try {
+      setIsUpdating(true);
       await updateOrderStatus(order.id, status);
     } catch (error) {
       console.error("Error al actualizar el estado:", error);
+    } finally {
+      setIsUpdating(false);
     }
   };
   
@@ -96,8 +102,16 @@ const OrderCard = ({ order, showControls = true }: OrderCardProps) => {
                 variant="outline"
                 className="border-blue-500 text-blue-500 hover:bg-blue-50"
                 onClick={() => handleStatusUpdate('preparing')}
+                disabled={isUpdating}
               >
-                Preparando
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Actualizando...
+                  </>
+                ) : (
+                  'Preparando'
+                )}
               </Button>
             )}
             
@@ -106,8 +120,16 @@ const OrderCard = ({ order, showControls = true }: OrderCardProps) => {
                 variant="outline"
                 className="border-green-500 text-green-500 hover:bg-green-50"
                 onClick={() => handleStatusUpdate('ready')}
+                disabled={isUpdating}
               >
-                Listo
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Actualizando...
+                  </>
+                ) : (
+                  'Listo'
+                )}
               </Button>
             )}
           </div>

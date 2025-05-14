@@ -98,6 +98,7 @@ export const OrderProvider = ({ children }: OrderProviderProps) => {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
+        console.log('Fetching orders...');
         const { data, error } = await supabase
           .from('orders')
           .select(`
@@ -108,7 +109,12 @@ export const OrderProvider = ({ children }: OrderProviderProps) => {
           `)
           .order('created_at', { ascending: false });
         
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching orders:', error);
+          throw error;
+        }
+
+        console.log('Orders fetched:', data);
 
         const formattedOrders = data.map(order => {
           const orderItems = order.order_items.map((item: any) => ({
@@ -133,6 +139,7 @@ export const OrderProvider = ({ children }: OrderProviderProps) => {
           };
         });
         
+        console.log('Formatted orders:', formattedOrders);
         setOrders(formattedOrders);
       } catch (error) {
         console.error('Error fetching orders:', error);
@@ -146,23 +153,30 @@ export const OrderProvider = ({ children }: OrderProviderProps) => {
 
     fetchOrders();
 
-    // Set up realtime subscription
-    const channel = supabase
+    // Set up improved realtime subscription
+    const ordersChannel = supabase
       .channel('orders-changes')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'orders' }, 
-        () => {
+        (payload) => {
+          console.log('Orders change received:', payload);
           fetchOrders();
         })
+      .subscribe();
+      
+    const orderItemsChannel = supabase
+      .channel('order-items-changes')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'order_items' }, 
-        () => {
+        (payload) => {
+          console.log('Order items change received:', payload);
           fetchOrders();
         })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(orderItemsChannel);
     };
   }, [toast]);
 
@@ -170,7 +184,6 @@ export const OrderProvider = ({ children }: OrderProviderProps) => {
     try {
       console.log("Enviando pedido:", { tableId, items, observations, userId });
       
-      // Use the service role if available (ensures RLS doesn't interfere)
       // Insert order
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
@@ -221,7 +234,7 @@ export const OrderProvider = ({ children }: OrderProviderProps) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "No se pudo crear el pedido. Verifica los permisos de RLS en Supabase.",
+        description: "No se pudo crear el pedido. Comprueba la conexión a internet.",
       });
       return Promise.reject(error);
     }
