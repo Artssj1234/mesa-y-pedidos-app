@@ -44,7 +44,7 @@ const Index = () => {
                   <CardHeader>
                     <CardTitle>Acceso Administrador</CardTitle>
                     <CardDescription>
-                      Ingrese sus credenciales de administrador
+                      Ingrese sus credenciales de administrador (Por defecto: Admin/Admin)
                     </CardDescription>
                   </CardHeader>
                   

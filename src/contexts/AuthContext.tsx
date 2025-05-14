@@ -103,8 +103,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const adminLogin = async (username: string, password: string) => {
     setIsLoading(true);
     try {
-      // For admin, we'll check username and use a fixed password for simplicity
-      // In a real app, you'd want to use proper authentication
+      // Query the users table to check if an admin with the provided username exists
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -113,21 +112,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         .single();
       
       if (error || !data) {
+        console.error('Admin login error:', error);
         toast({
           variant: "destructive",
           title: "Error de autenticación",
-          description: "Credenciales incorrectas",
+          description: "Usuario no encontrado",
         });
         setIsLoading(false);
         return;
       }
       
-      // In this demo, we're accepting "admin" as the password for all admin users
-      if (password === 'admin') {
+      // Check if the password matches - we'll use the 'code' field for password
+      // If code is null, we'll use 'Admin' as default password for backward compatibility
+      const expectedPassword = data.code || 'Admin';
+      
+      if (password === expectedPassword) {
         const userData: User = {
           id: data.id,
           name: data.name,
-          role: data.role as UserRole
+          role: data.role as UserRole,
+          code: data.code
         };
         
         setUser(userData);
