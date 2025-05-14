@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrders } from "@/contexts/OrderContext";
@@ -20,6 +19,7 @@ const Waiter = () => {
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
   const [observations, setObservations] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Redirect if not waiter
   useEffect(() => {
@@ -115,6 +115,7 @@ const Waiter = () => {
     if (!selectedTable || selectedItems.length === 0 || !user) return;
     
     try {
+      setIsSubmitting(true);
       await createOrder(selectedTable, selectedItems, observations, user.id);
       
       // Reset form
@@ -123,6 +124,8 @@ const Waiter = () => {
       setObservations("");
     } catch (error) {
       console.error("Error al enviar el pedido:", error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
@@ -253,10 +256,10 @@ const Waiter = () => {
                     
                     <Button 
                       className="w-full" 
-                      disabled={!selectedTable || selectedItems.length === 0}
+                      disabled={!selectedTable || selectedItems.length === 0 || isSubmitting}
                       onClick={handleSubmitOrder}
                     >
-                      Enviar Pedido a Cocina
+                      {isSubmitting ? 'Enviando...' : 'Enviar Pedido a Cocina'}
                     </Button>
                   </Card>
                 </div>

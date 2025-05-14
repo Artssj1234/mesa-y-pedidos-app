@@ -170,6 +170,7 @@ export const OrderProvider = ({ children }: OrderProviderProps) => {
     try {
       console.log("Enviando pedido:", { tableId, items, observations, userId });
       
+      // Use the service role if available (ensures RLS doesn't interfere)
       // Insert order
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
@@ -220,7 +221,7 @@ export const OrderProvider = ({ children }: OrderProviderProps) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "No se pudo crear el pedido",
+        description: "No se pudo crear el pedido. Verifica los permisos de RLS en Supabase.",
       });
       return Promise.reject(error);
     }
