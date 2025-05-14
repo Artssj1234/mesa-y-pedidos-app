@@ -28,21 +28,25 @@ const Waiter = () => {
     }
   }, [user, navigate]);
   
-  // Set first category as active when products load
-  useEffect(() => {
-    if (products.length > 0) {
-      const categories = [...new Set(products.map(p => p.category_id))];
-      if (categories.length > 0 && !activeCategory) {
-        setActiveCategory(categories[0] || "");
-      }
-    }
-  }, [products, activeCategory]);
-  
   // Filter active tables
   const activeTables = tables.filter(table => table.active);
   
   // Get unique categories from products
-  const categories = [...new Set(products.map(p => p.category))].filter(Boolean);
+  // Usar un Map para evitar categorías duplicadas basadas en category_id
+  const uniqueCategories = new Map();
+  products.forEach(product => {
+    if (product.category && product.category_id && !uniqueCategories.has(product.category_id)) {
+      uniqueCategories.set(product.category_id, product.category);
+    }
+  });
+  const categories = Array.from(uniqueCategories.entries()).map(([id, cat]) => ({id, ...cat}));
+  
+  // Set first category as active when products load
+  useEffect(() => {
+    if (categories.length > 0 && !activeCategory) {
+      setActiveCategory(categories[0]?.id || "");
+    }
+  }, [categories, activeCategory]);
   
   // Filter products by active category
   const filteredProducts = products.filter(p => p.category_id === activeCategory);
@@ -110,12 +114,16 @@ const Waiter = () => {
   const handleSubmitOrder = async () => {
     if (!selectedTable || selectedItems.length === 0 || !user) return;
     
-    await createOrder(selectedTable, selectedItems, observations, user.id);
-    
-    // Reset form
-    setSelectedTable(null);
-    setSelectedItems([]);
-    setObservations("");
+    try {
+      await createOrder(selectedTable, selectedItems, observations, user.id);
+      
+      // Reset form
+      setSelectedTable(null);
+      setSelectedItems([]);
+      setObservations("");
+    } catch (error) {
+      console.error("Error al enviar el pedido:", error);
+    }
   };
   
   return (
@@ -159,16 +167,14 @@ const Waiter = () => {
                     <div className="mb-4 overflow-x-auto">
                       <div className="flex space-x-2">
                         {categories.map(category => (
-                          category && (
-                            <Button
-                              key={category.id}
-                              variant={activeCategory === category.id ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => setActiveCategory(category.id)}
-                            >
-                              {category.name}
-                            </Button>
-                          )
+                          <Button
+                            key={category.id}
+                            variant={activeCategory === category.id ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setActiveCategory(category.id)}
+                          >
+                            {category.name}
+                          </Button>
                         ))}
                       </div>
                     </div>
